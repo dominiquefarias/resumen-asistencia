@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Resumen de Asistencia</title>
+    <!-- Librería SheetJS con soporte de Estilos (xlsx-js-style) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Paleta Morada y Lila */
+            --bg: #f5f0fa;
+            --surface: #ffffff;
+            --primary: #7c3aed;         /* Morado principal */
+            --primary-dark: #5b21b6;    /* Morado oscuro */
+            --primary-light: #f3e8ff;   /* Lila muy claro */
+            --accent-lila: #a855f7;     /* Lila vibrante */
+            --accent-soft-lila: #e9d5ff;/* Lila suave */
+            --text-main: #2e1065;       /* Texto morado profundo */
+            --text-muted: #6b21a8;      /* Texto morado medio */
+            --border: #e9d8fd;          /* Borde lila pastel */
+            
+            /* Tags / Badges */
+            --tag-red-bg: #fce7f3;
+            --tag-red-text: #9d174d;
+            --tag-blue-bg: #e0e7ff;
+            --tag-blue-text: #3730a3;
+            --tag-green-bg: #f3e8ff;
+            --tag-green-text: #6b21a8;
+
+            --shadow-sm: 0 2px 5px rgba(124, 58, 237, 0.05);
+            --shadow-md: 0 8px 25px -3px rgba(124, 58, 237, 0.12);
+            --shadow-lg: 0 12px 30px -5px rgba(124, 58, 237, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1450px;
+            width: 100%;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 35px;
+        }
+
+        header h1 {
+            font-size: 34px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #5b21b6 0%, #9333ea 50%, #c084fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            letter-spacing: -0.5px;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        .drop-zone {
+            background: var(--surface);
+            border: 2px dashed var(--accent-lila);
+            border-radius: 20px;
+            padding: 45px 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 35px;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--primary-dark);
+            background-color: var(--primary-light);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .drop-zone-icon-bg {
+            width: 70px;
+            height: 70px;
+            background: var(--primary-light);
+            color: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            margin: 0 auto 16px auto;
+            transition: transform 0.3s ease;
+        }
+
+        .drop-zone:hover .drop-zone-icon-bg {
+            transform: scale(1.1);
+        }
+
+        .drop-zone-text {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--primary-dark);
+            margin-bottom: 6px;
+        }
+
+        .drop-zone-subtext {
+            font-size: 13.5px;
+            color: var(--text-muted);
+        }
+
+        #file-input { display: none; }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 30px 0;
+            font-weight: 600;
+            color: var(--primary);
+            font-size: 16px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            border: 3px solid rgba(124, 58, 237, 0.2);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 0.8s ease-in-out infinite;
+            margin-bottom: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .metric-card {
+            background: linear-gradient(135deg, #ffffff 0%, #faf5ff 100%);
+            border-radius: 18px;
+            padding: 22px 24px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .metric-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .metric-data h3 {
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--primary-dark);
+            line-height: 1.2;
+        }
+
+        .metric-data p {
+            font-size: 13px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .action-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .action-bar h2 {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--primary-dark);
+        }
+
+        .btn-export {
+            background: linear-gradient(135deg, #7c3aed 0%, #9333ea 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        .btn-export:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+            background: linear-gradient(135deg, #6d28d9 0%, #7e22ce 100%);
+        }
+
+        .sheet-card {
+            background: var(--surface);
+            border-radius: 20px;
+            padding: 28px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border);
+            margin-bottom: 35px;
+        }
+
+        .sheet-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--primary-light);
+        }
+
+        .sheet-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sheet-badge {
+            background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+            color: var(--primary-dark);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+            border: 1px solid var(--border);
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        th {
+            background: linear-gradient(135deg, #f3e8ff 0%, #eef2ff 100%);
+            color: var(--primary-dark);
+            padding: 14px 12px;
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 14px 12px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-main);
+            white-space: nowrap;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background-color: #faf5ff;
+        }
+
+        .col-dec {
+            background-color: #f3e8ff;
+            font-weight: 700;
+            color: var(--primary-dark);
+        }
+
+        .tag {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 12px;
+            display: inline-block;
+        }
+
+        .tag-ausencia {
+            background-color: var(--tag-red-bg);
+            color: var(--tag-red-text);
+        }
+
+        .tag-licencia {
+            background-color: var(--tag-blue-bg);
+            color: var(--tag-blue-text);
+        }
+
+        .tag-ok {
+            background-color: var(--tag-green-bg);
+            color: var(--tag-green-text);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Consolidador de Asistencia</h1>
+        <p>Procesa reportes biométricos (.xls y .xlsx) con gama de horas sexagesimales y decimales</p>
+    </header>
+
+    <div class="drop-zone" id="drop-zone">
+        <div class="drop-zone-icon-bg">📁</div>
+        <div class="drop-zone-text">Arrastra tu archivo Excel aquí o haz clic para buscar</div>
+        <div class="drop-zone-subtext">Soporta archivos .xls y .xlsx con múltiples pestañas y trabajadores</div>
+        <input type="file" id="file-input" accept=".xlsx, .xls">
+    </div>
+
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div>Procesando y generando reporte consolidado...</div>
+    </div>
+
+    <div id="results-container"></div>
+</div>
+
+<script>
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const loading = document.getElementById('loading');
+    const resultsContainer = document.getElementById('results-container');
+    let processedData = [];
+
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+            handleFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleFile(e.target.files[0]);
+        }
+    });
+
+    function handleFile(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        loading.style.display = 'block';
+        resultsContainer.innerHTML = '';
+
+        fetch('/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            loading.style.display = 'none';
+            if (data.success) {
+                processedData = data.data;
+                renderDashboard(data.data);
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(err => {
+            loading.style.display = 'none';
+            alert('Ocurrió un error al procesar el archivo.');
+            console.error(err);
+        });
+    }
+
+    function renderDashboard(sheets) {
+        resultsContainer.innerHTML = '';
+
+        if (sheets.length === 0) {
+            resultsContainer.innerHTML = '<div class="sheet-card"><p style="text-align:center;">No se encontraron registros de trabajadores en el archivo.</p></div>';
+            return;
+        }
+
+        let totalWorkers = 0;
+        let totalFaltas = 0;
+        let totalLicencias = 0;
+
+        sheets.forEach(s => {
+            totalWorkers += s.workers.length;
+            s.workers.forEach(w => {
+                if (w.ausencias_str !== 'Sin faltas') totalFaltas++;
+                if (w.licencias_str !== 'Sin licencias') totalLicencias++;
+            });
+        });
+
+        const metricsHTML = `
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-icon" style="background:#f3e8ff; color:#7c3aed;">📑</div>
+                    <div class="metric-data">
+                        <h3>${sheets.length}</h3>
+                        <p>Hojas Procesadas</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon" style="background:#e9d5ff; color:#5b21b6;">👥</div>
+                    <div class="metric-data">
+                        <h3>${totalWorkers}</h3>
+                        <p>Trabajadores Totales</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon" style="background:#fce7f3; color:#9d174d;">⚠️</div>
+                    <div class="metric-data">
+                        <h3>${totalFaltas}</h3>
+                        <p>Personas con Faltas</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon" style="background:#e0e7ff; color:#3730a3;">🏥</div>
+                    <div class="metric-data">
+                        <h3>${totalLicencias}</h3>
+                        <p>Licencias Médicas</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-bar">
+                <h2>Resumen Consolidado</h2>
+                <button class="btn-export" onclick="exportAllSheetsToExcel()">
+                    💜 Descargar Excel (.xls)
+                </button>
+            </div>
+        `;
+
+        resultsContainer.insertAdjacentHTML('beforeend', metricsHTML);
+
+        sheets.forEach((sheet, sheetIdx) => {
+            const card = document.createElement('div');
+            card.className = 'sheet-card';
+
+            let tableRowsHTML = '';
+            sheet.workers.forEach(w => {
+                const ausenciasHTML = w.ausencias_str !== 'Sin faltas' 
+                    ? `<span class="tag tag-ausencia">${w.ausencias_str}</span>` 
+                    : `<span class="tag tag-ok">Sin faltas</span>`;
+
+                const licenciasHTML = w.licencias_str !== 'Sin licencias' 
+                    ? `<span class="tag tag-licencia">${w.licencias_str}</span>` 
+                    : `<span class="tag tag-ok">Sin licencias</span>`;
+
+                tableRowsHTML += `
+                    <tr>
+                        <td><strong>${w.rut}</strong></td>
+                        <td><strong>${w.nombre}</strong></td>
+                        <td>${w.hrs_domingo}</td>
+                        <td class="col-dec">${w.hrs_domingo_dec}</td>
+                        <td>${w.hrs_extra_domingo}</td>
+                        <td class="col-dec">${w.hrs_extra_domingo_dec}</td>
+                        <td>${w.horas_festivas}</td>
+                        <td class="col-dec">${w.horas_festivas_dec}</td>
+                        <td>${w.horas_extras}</td>
+                        <td class="col-dec">${w.horas_extras_dec}</td>
+                        <td>${w.hrs_descuento}</td>
+                        <td class="col-dec">${w.hrs_descuento_dec}</td>
+                        <td>${ausenciasHTML}</td>
+                        <td>${licenciasHTML}</td>
+                    </tr>
+                `;
+            });
+
+            card.innerHTML = `
+                <div class="sheet-header">
+                    <div class="sheet-title">
+                        <span>Hoja:</span>
+                        <span class="sheet-badge">${sheet.sheet_name}</span>
+                    </div>
+                    <span style="color: var(--text-muted); font-size: 13px; font-weight: 600;">
+                        ${sheet.workers.length} trabajadores
+                    </span>
+                </div>
+                <div class="table-wrapper">
+                    <table id="table-sheet-${sheetIdx}">
+                        <thead>
+                            <tr>
+                                <th>RUT</th>
+                                <th>Nombre</th>
+                                <th>Hrs Dom</th>
+                                <th class="col-dec">Dom (Dec)</th>
+                                <th>Extra Dom</th>
+                                <th class="col-dec">Ext Dom (Dec)</th>
+                                <th>Hrs Festivo</th>
+                                <th class="col-dec">Festivo (Dec)</th>
+                                <th>Hrs Extras</th>
+                                <th class="col-dec">Extras (Dec)</th>
+                                <th>Descuento</th>
+                                <th class="col-dec">Descuento (Dec)</th>
+                                <th>Faltas</th>
+                                <th>Licencias Médicas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRowsHTML}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            resultsContainer.appendChild(card);
+        });
+    }
+
+    // Exportación directa en formato .XLS
+    function exportAllSheetsToExcel() {
+        if (!processedData || processedData.length === 0) return;
+
+        const wb = XLSX.utils.book_new();
+
+        processedData.forEach((sheetData) => {
+            const headers = [
+                "RUT", "Nombre Empleado", 
+                "Hrs Domingo", "Hrs Dom (Dec)", 
+                "Extra Dom", "Extra Dom (Dec)", 
+                "Hrs Festivo", "Festivo (Dec)", 
+                "Hrs Extras", "Extras (Dec)", 
+                "Hrs Descuento", "Descuento (Dec)", 
+                "Faltas (Días)", "Licencias Médicas"
+            ];
+
+            const rows = [headers];
+
+            sheetData.workers.forEach(w => {
+                rows.push([
+                    w.rut,
+                    w.nombre,
+                    w.hrs_domingo,
+                    w.hrs_domingo_dec,
+                    w.hrs_extra_domingo,
+                    w.hrs_extra_domingo_dec,
+                    w.horas_festivas,
+                    w.horas_festivas_dec,
+                    w.horas_extras,
+                    w.horas_extras_dec,
+                    w.hrs_descuento,
+                    w.hrs_descuento_dec,
+                    w.ausencias_str,
+                    w.licencias_str
+                ]);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+
+            // Estilos Ejecutivos Morados
+            const headerStyle = {
+                font: { name: "Segoe UI", sz: 11, bold: true, color: { rgb: "FFFFFF" } },
+                fill: { fgColor: { rgb: "5B21B6" } },
+                alignment: { horizontal: "center", vertical: "center" },
+                border: { bottom: { style: "medium", color: { rgb: "4C1D95" } } }
+            };
+
+            const dataStyleEven = {
+                font: { name: "Segoe UI", sz: 10, color: { rgb: "1E1B4B" } },
+                fill: { fgColor: { rgb: "FFFFFF" } },
+                alignment: { horizontal: "center", vertical: "center" },
+                border: {
+                    bottom: { style: "thin", color: { rgb: "E9D8FD" } },
+                    right: { style: "thin", color: { rgb: "F3E8FF" } }
+                }
+            };
+
+            const dataStyleOdd = {
+                font: { name: "Segoe UI", sz: 10, color: { rgb: "1E1B4B" } },
+                fill: { fgColor: { rgb: "FAF5FF" } },
+                alignment: { horizontal: "center", vertical: "center" },
+                border: {
+                    bottom: { style: "thin", color: { rgb: "E9D8FD" } },
+                    right: { style: "thin", color: { rgb: "F3E8FF" } }
+                }
+            };
+
+            const decimalColStyle = {
+                font: { name: "Segoe UI", sz: 10, bold: true, color: { rgb: "5B21B6" } },
+                fill: { fgColor: { rgb: "F3E8FF" } },
+                alignment: { horizontal: "center", vertical: "center" },
+                border: { bottom: { style: "thin", color: { rgb: "E9D8FD" } } }
+            };
+
+            const nameAlignStyle = {
+                font: { name: "Segoe UI", sz: 10, bold: true, color: { rgb: "1E1B4B" } },
+                alignment: { horizontal: "left", vertical: "center" }
+            };
+
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            for (let R = range.s.r; R <= range.e.r; ++R) {
+                for (let C = range.s.c; C <= range.e.c; ++C) {
+                    const cell_address = XLSX.utils.encode_cell({ r: R, c: C });
+                    if (!ws[cell_address]) continue;
+
+                    if (R === 0) {
+                        ws[cell_address].s = headerStyle;
+                    } else {
+                        const baseStyle = (R % 2 === 0) ? dataStyleOdd : dataStyleEven;
+                        
+                        if (C === 1) {
+                            ws[cell_address].s = { ...baseStyle, ...nameAlignStyle };
+                        } else if ([3, 5, 7, 9, 11].includes(C)) {
+                            ws[cell_address].s = decimalColStyle;
+                        } else {
+                            ws[cell_address].s = baseStyle;
+                        }
+                    }
+                }
+            }
+
+            const colWidths = headers.map((h, colIdx) => {
+                let maxLen = h.length;
+                for (let R = 1; R <= range.e.r; ++R) {
+                    const cell = ws[XLSX.utils.encode_cell({ r: R, c: colIdx })];
+                    if (cell && cell.v) {
+                        maxLen = Math.max(maxLen, String(cell.v).length);
+                    }
+                }
+                return { wch: maxLen + 4 };
+            });
+            ws['!cols'] = colWidths;
+            ws['!rows'] = [{ hpt: 26 }];
+            for (let i = 1; i <= range.e.r; i++) {
+                ws['!rows'].push({ hpt: 20 });
+            }
+
+            const sheetName = sheetData.sheet_name.substring(0, 31);
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        });
+
+        // Generar y descargar explícitamente en formato .xls
+        XLSX.writeFile(wb, "Resumen_Asistencia_Consolidado.xls", { bookType: "biff8" });
+    }
+</script>
+
+</body>
+</html>
