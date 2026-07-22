@@ -10,19 +10,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            /* Paleta Morada y Lila */
             --bg: #f5f0fa;
             --surface: #ffffff;
-            --primary: #7c3aed;         /* Morado principal */
-            --primary-dark: #5b21b6;    /* Morado oscuro */
-            --primary-light: #f3e8ff;   /* Lila muy claro */
-            --accent-lila: #a855f7;     /* Lila vibrante */
-            --accent-soft-lila: #e9d5ff;/* Lila suave */
-            --text-main: #2e1065;       /* Texto morado profundo */
-            --text-muted: #6b21a8;      /* Texto morado medio */
-            --border: #e9d8fd;          /* Borde lila pastel */
+            --primary: #7c3aed;
+            --primary-dark: #5b21b6;
+            --primary-light: #f3e8ff;
+            --accent-lila: #a855f7;
+            --accent-soft-lila: #e9d5ff;
+            --text-main: #2e1065;
+            --text-muted: #6b21a8;
+            --border: #e9d8fd;
             
-            /* Tags / Badges */
             --tag-red-bg: #fce7f3;
             --tag-red-text: #9d174d;
             --tag-blue-bg: #e0e7ff;
@@ -340,7 +338,7 @@
 <div class="container">
     <header>
         <h1>Consolidador de Asistencia</h1>
-        <p>Procesa reportes biométricos (.xls y .xlsx) con gama de horas sexagesimales y decimales</p>
+        <p>Procesa reportes biométricos (.xls y .xlsx) con horas sin ':' y columnas decimales adjuntas</p>
     </header>
 
     <div class="drop-zone" id="drop-zone">
@@ -529,9 +527,9 @@
                                 <th>RUT</th>
                                 <th>Nombre</th>
                                 <th>Hrs Dom</th>
-                                <th class="col-dec">Dom (Dec)</th>
+                                <th class="col-dec">Hrs Dom (Dec)</th>
                                 <th>Extra Dom</th>
-                                <th class="col-dec">Ext Dom (Dec)</th>
+                                <th class="col-dec">Extra Dom (Dec)</th>
                                 <th>Hrs Festivo</th>
                                 <th class="col-dec">Festivo (Dec)</th>
                                 <th>Hrs Extras</th>
@@ -552,7 +550,7 @@
         });
     }
 
-    // Exportación directa en formato .XLS
+    // Exportación a Excel .xls
     function exportAllSheetsToExcel() {
         if (!processedData || processedData.length === 0) return;
 
@@ -561,11 +559,11 @@
         processedData.forEach((sheetData) => {
             const headers = [
                 "RUT", "Nombre Empleado", 
-                "Hrs Domingo", "Hrs Dom (Dec)", 
-                "Extra Dom", "Extra Dom (Dec)", 
-                "Hrs Festivo", "Festivo (Dec)", 
-                "Hrs Extras", "Extras (Dec)", 
-                "Hrs Descuento", "Descuento (Dec)", 
+                "Hrs Domingo", "Hrs Dom (Dec)",
+                "Extra Dom", "Extra Dom (Dec)",
+                "Hrs Festivo", "Festivo (Dec)",
+                "Hrs Extras", "Extras (Dec)",
+                "Hrs Descuento", "Descuento (Dec)",
                 "Faltas (Días)", "Licencias Médicas"
             ];
 
@@ -674,7 +672,6 @@
             XLSX.utils.book_append_sheet(wb, ws, sheetName);
         });
 
-        // Generar y descargar explícitamente en formato .xls
         XLSX.writeFile(wb, "Resumen_Asistencia_Consolidado.xls", { bookType: "biff8" });
     }
 </script>
