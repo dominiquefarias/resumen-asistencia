@@ -8,61 +8,72 @@ import openpyxl
 
 app = Flask(__name__)
 
-def truncate_decimal(val, decimals=3):
+def convert_colon_to_comma(val):
     """
-    Trunca un número flotante a máximo 3 decimales sin redondear hacia arriba.
-    """
-    factor = 10 ** decimals
-    truncated = math.trunc(val * factor) / factor
-    s = f"{truncated:.{decimals}f}".rstrip('0').rstrip('.')
-    return s.replace('.', ',') if s else "0"
-
-
-def format_time_val(val):
-    """
-    Retorna una tupla: (Tiempo HH:MM, Tiempo en Decimal TRUNCADO A MAX 3 DECIMALES)
+    Simplemente reemplaza ':' por ',' manteniendo el texto tal cual (ej. "22:30" -> "22,30").
     """
     if val is None or str(val).strip() == "":
-        return "0:00", "0"
+        return "0"
+
+    if isinstance(val, float):
+        total_minutes = int(round(val * 24 * 60))
+        h = total_minutes // 60
+        m = total_minutes % 60
+        return f"{h},{m:02d}"
+
+    val_str = str(val).strip()
+    if ":" in val_str:
+        return val_str.replace(":", ",")
+    return val_str.replace(".", ",")
+
+
+def convert_time_to_decimal_comma(val):
+    """
+    Convierte el tiempo sexagesimal a su equivalente matemático decimal (ej. "22:30" -> "22,5").
+    """
+    if val is None or str(val).strip() == "":
+        return "0"
 
     if isinstance(val, float):
         total_minutes = val * 24 * 60
         h = int(total_minutes // 60)
         m = total_minutes % 60
         dec_val = h + (m / 60.0)
-        dec_str = truncate_decimal(dec_val, 3)
-        total_m_int = int(round(total_minutes))
-        return f"{total_m_int // 60}:{total_m_int % 60:02d}", dec_str
+        factor = 10 ** 3
+        truncated = math.trunc(dec_val * factor) / factor
+        s = f"{truncated:.3f}".rstrip('0').rstrip('.')
+        return s.replace('.', ',') if s else "0"
 
     val_str = str(val).strip()
-    
     if ":" in val_str:
         parts = val_str.split(":")
         try:
             h = int(parts[0])
             m = int(parts[1])
             dec_val = h + (m / 60.0)
-            dec_str = truncate_decimal(dec_val, 3)
-            return f"{h}:{m:02d}", dec_str
+            factor = 10 ** 3
+            truncated = math.trunc(dec_val * factor) / factor
+            s = f"{truncated:.3f}".rstrip('0').rstrip('.')
+            return s.replace('.', ',') if s else "0"
         except ValueError:
-            return val_str, "0"
+            return val_str.replace('.', ',')
 
-    return val_str, "0"
+    return val_str.replace('.', ',')
 
 
 def create_empty_worker():
     return {
         'rut': "Sin RUT",
         'nombre': "Sin Nombre",
-        'hrs_domingo': "0:00",
+        'hrs_domingo': "0",
         'hrs_domingo_dec': "0",
-        'hrs_extra_domingo': "0:00",
+        'hrs_extra_domingo': "0",
         'hrs_extra_domingo_dec': "0",
-        'horas_festivas': "0:00",
+        'horas_festivas': "0",
         'horas_festivas_dec': "0",
-        'horas_extras': "0:00",
+        'horas_extras': "0",
         'horas_extras_dec': "0",
-        'hrs_descuento': "0:00",
+        'hrs_descuento': "0",
         'hrs_descuento_dec': "0",
         'ausencias': [],
         'licencias': [],
@@ -136,31 +147,33 @@ def process_raw_sheet_matrix(matrix):
                         if day_num not in current_worker['ausencias']:
                             current_worker['ausencias'].append(day_num)
 
-        # Capturar la tabla Resumen Total
+        # Capturar valores generando tanto el formato con coma como el cálculo decimal
         for c_idx, cell in enumerate(row):
             lbl = str(cell or "").strip().upper()
 
-            def get_right_value():
+            def get_right_values():
                 for k in range(c_idx + 1, len(row)):
                     v = row[k]
                     if v is not None and str(v).strip() != "":
-                        return format_time_val(v)
-                return "0:00", "0"
+                        c_val = convert_colon_to_comma(v)
+                        d_val = convert_time_to_decimal_comma(v)
+                        return c_val, d_val
+                return "0", "0"
 
             if "HORAS DOMINGO" in lbl:
-                current_worker['hrs_domingo'], current_worker['hrs_domingo_dec'] = get_right_value()
+                current_worker['hrs_domingo'], current_worker['hrs_domingo_dec'] = get_right_values()
                 current_worker['has_summary'] = True
             elif "HRS. EXTRA DOMINGO" in lbl or "EXTRA DOMINGO" in lbl:
-                current_worker['hrs_extra_domingo'], current_worker['hrs_extra_domingo_dec'] = get_right_value()
+                current_worker['hrs_extra_domingo'], current_worker['hrs_extra_domingo_dec'] = get_right_values()
                 current_worker['has_summary'] = True
             elif "HORAS FESTIVAS" in lbl or "HRS. FESTIVAS" in lbl:
-                current_worker['horas_festivas'], current_worker['horas_festivas_dec'] = get_right_value()
+                current_worker['horas_festivas'], current_worker['horas_festivas_dec'] = get_right_values()
                 current_worker['has_summary'] = True
             elif "HORAS EXTRAS" in lbl or "HRS. EXTRAS" in lbl:
-                current_worker['horas_extras'], current_worker['horas_extras_dec'] = get_right_value()
+                current_worker['horas_extras'], current_worker['horas_extras_dec'] = get_right_values()
                 current_worker['has_summary'] = True
             elif "HRS. DESCUENTO" in lbl or "HORAS DESCUENTO" in lbl:
-                current_worker['hrs_descuento'], current_worker['hrs_descuento_dec'] = get_right_value()
+                current_worker['hrs_descuento'], current_worker['hrs_descuento_dec'] = get_right_values()
                 current_worker['has_summary'] = True
 
     if current_worker and (current_worker['nombre'] != "Sin Nombre" or current_worker['rut'] != "Sin RUT"):
@@ -178,7 +191,7 @@ def finalize_worker(w):
 def consolidate_workers(workers):
     final_list = []
     for w in workers:
-        if w['nombre'] == "Sin Nombre" and w['rut'] == "Sin RUT" and w['hrs_domingo'] == "0:00" and w['horas_extras'] == "0:00":
+        if w['nombre'] == "Sin Nombre" and w['rut'] == "Sin RUT" and w['hrs_domingo'] == "0" and w['horas_extras'] == "0":
             continue
 
         existing = None
@@ -195,10 +208,17 @@ def consolidate_workers(workers):
             if existing['nombre'] == "Sin Nombre" and w['nombre'] != "Sin Nombre":
                 existing['nombre'] = w['nombre']
 
-            for k in ['hrs_domingo', 'hrs_extra_domingo', 'horas_festivas', 'horas_extras', 'hrs_descuento']:
-                if existing[k] == "0:00" and w[k] != "0:00":
+            fields = [
+                ('hrs_domingo', 'hrs_domingo_dec'),
+                ('hrs_extra_domingo', 'hrs_extra_domingo_dec'),
+                ('horas_festivas', 'horas_festivas_dec'),
+                ('horas_extras', 'horas_extras_dec'),
+                ('hrs_descuento', 'hrs_descuento_dec')
+            ]
+            for k, k_dec in fields:
+                if existing[k] == "0" and w[k] != "0":
                     existing[k] = w[k]
-                    existing[f"{k}_dec"] = w[f"{k}_dec"]
+                    existing[k_dec] = w[k_dec]
 
             if w['ausencias_str'] != "Sin faltas":
                 existing['ausencias_str'] = w['ausencias_str'] if existing['ausencias_str'] == "Sin faltas" else f"{existing['ausencias_str']} - {w['ausencias_str']}"
